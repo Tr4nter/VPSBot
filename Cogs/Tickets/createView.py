@@ -26,13 +26,6 @@ storeDataPath = 'storedata.json'
 promocodeDataPath = 'promocodes.json'
 
 
-def productList():
-    storeData = get_json(storeDataPath)
-
-
-    return [
-        SelectOption(label=f'{k}: ${v}', value=k) for k, v in storeData['items'].items()
-        ]
 print(os.environ.get('SERVERIP'))
 print(os.environ.get('PRIVATE_CRYPTO'))
 print(os.environ.get('BITTOKEN'))
@@ -61,11 +54,11 @@ class promoCodeModal(discord.ui.Modal, title="Promocode"):
 class createTicket(View):
 
 
-    def __init__(self):
+    def __init__(self, productList):
         super().__init__(timeout=None)
 
 
-        self.productSelection = discord.ui.Select(custom_id="productSelection", options=productList(), placeholder="Select product...")
+        self.productSelection = discord.ui.Select(custom_id="productSelection", options=productList, placeholder="Select product...")
         self.productSelection.callback = self.productSelectionSelectCallback
 
         self.paymentMethod = discord.ui.Select(custom_id="paymentMethod", options=

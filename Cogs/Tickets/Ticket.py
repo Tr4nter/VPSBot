@@ -16,6 +16,14 @@ from jsonutils import get_json
 from utils import check, ctxcheck
 ticketDataPath = 'ticketdata.json'
 
+async def productList(bot):
+    storeData = bot.storeCollections.find()
+
+
+    return [
+        SelectOption(label=f'{k["_id"]}: ${k["Price"]}', value=k) async for k in storeData
+        ]
+
 
 class Ticket(commands.Cog):
     def __init__(self, bot):
@@ -87,7 +95,7 @@ class Ticket(commands.Cog):
             if channel and message:
                 await message.delete()
 
-        interactionMessage = await interaction.channel.send(view=createTicket())
+        interactionMessage = await interaction.channel.send(view=createTicket(await productList(interaction.client)))
 
         ticketData["ticketCreateMessage"] = interactionMessage.id
         ticketData["ticketCreateMessageChannel"] = interaction.channel.id

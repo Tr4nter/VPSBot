@@ -14,6 +14,7 @@ from discord.utils import get
 from jsonutils import save_json
 from jsonutils import get_json
 from utils import check, ctxcheck, productList
+import os
 ticketDataPath = 'ticketdata.json'
 
 
@@ -24,7 +25,7 @@ class Ticket(commands.Cog):
 
 
     @app_commands.command(name='set_ticket_category')
-    @app_commands.guilds(discord.Object(id=1163825960399949884))
+    @app_commands.guilds(discord.Object(id=int(os.environ.get("STORESERVERID"))))
     @app_commands.check(check)
     async def set_ticket_category(self, interaction: Interaction, category: discord.CategoryChannel):
         ticketData = get_json('settings.json')
@@ -46,15 +47,15 @@ class Ticket(commands.Cog):
 
 
     @app_commands.command(name='close_ticket')
-    @app_commands.guilds(discord.Object(id=1163825960399949884))
+    @app_commands.guilds(discord.Object(id=int(os.environ.get("STORESERVERID"))))
+
     @app_commands.check(check)
     async def close_ticket(self, interaction: Interaction, ticket_channel: TextChannel):
-        ticketData = await interaction.client.ticketCollections.find() 
-        async for userData in ticketData["Tickets"]:
+        ticketData = interaction.client.ticketCollections.find() 
+        async for userData in ticketData:
             if not "ticketChannel" in userData: continue
             if userData["ticketChannel"] == ticket_channel.id:
                 try:
-                    userObject = await interaction.guild.fetch_member(userData["_id"])
                     channel = await self.bot.fetch_channel(ticket_channel.id)
                 except discord.errors.NotFound: return
                 try:
@@ -68,10 +69,12 @@ class Ticket(commands.Cog):
 
 
     @app_commands.command(name='send_button')
-    @app_commands.guilds(discord.Object(id=1163825960399949884))
+    @app_commands.guilds(discord.Object(id=int(os.environ.get("STORESERVERID"))))
+
     @app_commands.check(check)
     async def send_button(self, interaction: Interaction):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
+
 
         guild: Guild = interaction.guild
 
@@ -89,12 +92,12 @@ class Ticket(commands.Cog):
                 await message.delete()
 
         interactionMessage = await interaction.channel.send(view=createTicket(await productList(interaction.client)))
-
         ticketData["ticketCreateMessage"] = interactionMessage.id
         ticketData["ticketCreateMessageChannel"] = interaction.channel.id
 
         save_json(ticketData, ticketDataPath)
 
+        await interaction.followup.send("DONE", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Ticket(bot))

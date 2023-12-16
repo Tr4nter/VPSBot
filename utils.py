@@ -25,5 +25,5 @@ async def productList(bot):
 
 
     return [
-        SelectOption(label=f'{k["_id"]}: ${k["Price"]}', value=k) async for k in storeData
+        SelectOption(label=f'{k["_id"]}: ${k["Price"]}', value=k["_id"]) async for k in storeData
         ]

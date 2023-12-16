@@ -44,6 +44,16 @@ class BotWithDatabase(commands.Bot):
 
 client: BotWithDatabase = BotWithDatabase(command_prefix='!' ,intents=discord.Intents.all())
 
+async def on_tree_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        return await interaction.response.send_message(f"Command is currently on cooldown! Try again in **{error.retry_after:.2f}** seconds!", ephemeral=True)
+    elif isinstance(error, app_commands.MissingPermissions):
+        return await interaction.response.send_message(f"You're missing permissions to use that", ephemeral=True)
+    elif isinstance(error, app_commands.CheckFailure):
+        return await interaction.response.send_message(f"You're missing permissions to use that", ephemeral=True)
+    else:
+        print( error )
+client.tree.on_error = on_tree_error
 
 async def checkAdmin(ctx: Context):
     return ctx.author.id == 672514949184225310
@@ -119,9 +129,9 @@ async def loopa():
 
 
 # @client.tree.interaction_check
-@client.tree.command(name="deliver", guild=discord.Object(id=1163826007501979670))
+@client.tree.command(name="deliver", guild=discord.Object(id=os.environ.get("DELIVERYSERVERID")))
 async def deliver(ctx: discord.Interaction, id: str, ip: str, username: str, password: str):
-    if ctx.user.id != os.environ.get("ADMIN") and ctx.user.id != int(confirmer): return
+    if ctx.user.id != os.environ.get("DELIVERYID"): return
     await ctx.response.defer()
     loopData =  client.ticketCollections.find()
     # content = ' '.join(content)
@@ -149,18 +159,20 @@ async def deliver(ctx: discord.Interaction, id: str, ip: str, username: str, pas
             return
 
 async def reboot_AutoComplete(interaction, current: str) -> List[app_commands.Choice[str]]:
-    panelData = await client.rebootRequests.find_one({"_id": interaction.user.id})
+    panelData = client.rebootRequests.find()
     if not panelData: return []
     res = []
-    for machine_id in panelData["machines"]:
-        res.append(machine_id)
+    async for machines in panelData:
+        for machine_id in machines["machines"]:
+            print(machine_id)
+            res.append(machine_id)
     return [app_commands.Choice(name=k, value=str(k)) for k in res]
 
 
-@client.tree.command(name="confirm_reboot", guild=discord.Object(id=1163826007501979670))
+@client.tree.command(name="confirm_reboot", guild=discord.Object(id=os.environ.get("DELIVERYSERVERID")))
 @app_commands.autocomplete(machine_id=reboot_AutoComplete)
 async def confirm_reboot(ctx: discord.Interaction, machine_id: str):
-    if ctx.user.id != os.environ.get("ADMIN") and ctx.user.id != int(confirmer): return
+    if ctx.user.id != int(os.environ.get("DELIVERYID")): return
     user = 0
     rebootRequests =  client.rebootRequests.find()
     async for userData in rebootRequests:
@@ -183,9 +195,9 @@ async def confirm_reboot(ctx: discord.Interaction, machine_id: str):
 
 
 # @client.tree.interaction_check(deliveryCheck)
-@client.tree.command(name="get_queue", guild=discord.Object(id=1163826007501979670))
+@client.tree.command(name="get_queue", guild=discord.Object(id=os.environ.get("DELIVERYSERVERID")))
 async def get_queue(interaction: discord.Interaction):
-    if interaction.user.id != os.environ.get("ADMIN") and interaction.user.id != int(confirmer): return
+    if interaction.user.id != int(os.environ.get("DELIVERYID")): return
     rebootRequests = client.rebootRequests.find()
     res = "```"
     async for rebootRequest in rebootRequests:
@@ -209,6 +221,7 @@ async def get_queue(interaction: discord.Interaction):
 
 @client.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    if payload.user_id != int(confirmer): return 
     con = await client.fetch_user(confirmer)
     channel = con.dm_channel
     if not channel: channel = await con.create_dm()

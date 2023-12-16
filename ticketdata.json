@@ -1,15 +1,7 @@
 {
-    "ticketCreateMessage": 1166245489285533786,
-    "ticketCreateMessageChannel": 1163927407938514954,
-    "ticketCategory": 1164133445400797216,
     "forwardChannel": 1164281762520760441,
-    "Tickets": {
-        "672514949184225310": {
-            "currentInvoice": null,
-            "currentProduct": null,
-            "currentRegion": null,
-            "currentMessage": 1167085281804034170,
-            "ticketChannel": 1165500623471517696
-        }
-    }
+    "buyerRole": 1165572761738035240,
+    "ticketCategory": 1164133445400797216,
+    "ticketCreateMessage": 1185587963443281920,
+    "ticketCreateMessageChannel": 1163927407938514954
 }

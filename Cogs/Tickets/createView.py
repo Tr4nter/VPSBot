@@ -36,16 +36,16 @@ class promoCodeModal(discord.ui.Modal, title="Promocode"):
     val: dict = None
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        promocodeData = get_json(promocodeDataPath)
         promocode = self.rom.value
-        if not promocode in promocodeData: await interaction.response.send_message("Wrong code", ephemeral=True, delete_after=5)
-        if promocodeData[promocode]["Type"] == "literal":
-            await interaction.response.send_message(f'Successful, you will receive a ${promocodeData[promocode]["Value"]} discount', ephemeral=True, delete_after=5)
+        promocodeData = await interaction.client.promocodeCollections.find_one(promocode)
+        if not promocodeData: await interaction.response.send_message("Wrong code", ephemeral=True, delete_after=5); return
+        if promocodeData["Type"] == "literal":
+            await interaction.response.send_message(f'Successful, you will receive a ${promocodeData["Value"]} discount', ephemeral=True, delete_after=5)
         else:
-            await interaction.response.send_message(f'Successful, you will receive a {promocodeData[promocode]["Value"]}% discount', ephemeral=True, delete_after=5)
+            await interaction.response.send_message(f'Successful, you will receive a {promocodeData["Value"]}% discount', ephemeral=True, delete_after=5)
 
 
-        self.val = promocodeData[promocode]
+        self.val = promocodeData
 
 
 

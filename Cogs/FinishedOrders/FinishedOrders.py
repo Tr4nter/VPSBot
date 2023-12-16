@@ -11,6 +11,7 @@ from discord.utils import get
 
 from jsonutils import save_json
 from jsonutils import get_json
+import os
 from utils import check, ctxcheck
 
 finishedDataPath = 'finished.json'
@@ -37,7 +38,8 @@ class FinishedOrders(commands.Cog):
 
 
     @app_commands.command(name='view_finished')
-    @app_commands.guilds(discord.Object(id=1163825960399949884))
+    @app_commands.guilds(discord.Object(id=int(os.environ.get("STORESERVERID"))))
+
     @app_commands.check(fincheck)
     async def view_finished(self, interaction: Interaction):
         finishedData = interaction.client.finishedCollections.find()
@@ -57,7 +59,8 @@ class FinishedOrders(commands.Cog):
 
 
     @app_commands.command(name='change_finished')
-    @app_commands.guilds(discord.Object(id=1163825960399949884))
+    @app_commands.guilds(discord.Object(id=int(os.environ.get("STORESERVERID"))))
+
     @app_commands.autocomplete(labels=labelAutoComplete)
     @app_commands.check(fincheck)
     async def change_finished(self, interaction: Interaction, labels: str, amount: int):
@@ -69,7 +72,8 @@ class FinishedOrders(commands.Cog):
 
 
     @app_commands.command(name='increase_finished')
-    @app_commands.guilds(discord.Object(id=1163825960399949884))
+    @app_commands.guilds(discord.Object(id=int(os.environ.get("STORESERVERID"))))
+
     @app_commands.autocomplete(labels=labelAutoComplete)
     @app_commands.check(fincheck)
     async def increase_finished(self, interaction: Interaction, labels: str):
@@ -79,7 +83,8 @@ class FinishedOrders(commands.Cog):
 
 
     @app_commands.command(name='decrease_finished')
-    @app_commands.guilds(discord.Object(id=1163825960399949884))
+    @app_commands.guilds(discord.Object(id=int(os.environ.get("STORESERVERID"))))
+
     @app_commands.autocomplete(labels=labelAutoComplete)
     @app_commands.check(check)
     async def decrease_finished(self, interaction: Interaction, labels: str):

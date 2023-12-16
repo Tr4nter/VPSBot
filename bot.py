@@ -17,6 +17,7 @@ from jsonutils import save_json
 from jsonutils import get_json
 from utils import deliveryCheck
 from utils import admin
+from utils import productList
 
 
 from dotenv import load_dotenv
@@ -265,7 +266,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
 @client.event 
 async def on_ready():
    
-    client.add_view(createTicket())
+    client.add_view(createTicket(await productList(client)))
     await client.tree.sync(guild=discord.Object('1163825960399949884'))
     await client.tree.sync(guild=discord.Object('1163826007501979670'))
     print(f"{client.user} is ready")

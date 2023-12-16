@@ -1,4 +1,5 @@
 import discord
+from discord import SelectOption
 import os
 from btcpay import BTCPayClient
 from discord.ext.commands import Context
@@ -17,3 +18,12 @@ async def ctxcheck(interaction: Context):
 
 async def deliveryCheck(interaction):
     return interaction.user.id == os.environ.get("CONFIRMER") 
+
+
+async def productList(bot):
+    storeData = bot.storeCollections.find()
+
+
+    return [
+        SelectOption(label=f'{k["_id"]}: ${k["Price"]}', value=k) async for k in storeData
+        ]

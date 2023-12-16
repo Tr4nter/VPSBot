@@ -13,16 +13,9 @@ from discord.utils import get
 
 from jsonutils import save_json
 from jsonutils import get_json
-from utils import check, ctxcheck
+from utils import check, ctxcheck, productList
 ticketDataPath = 'ticketdata.json'
 
-async def productList(bot):
-    storeData = bot.storeCollections.find()
-
-
-    return [
-        SelectOption(label=f'{k["_id"]}: ${k["Price"]}', value=k) async for k in storeData
-        ]
 
 
 class Ticket(commands.Cog):

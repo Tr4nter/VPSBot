@@ -12,8 +12,8 @@ from utils import check
 promocodeDataPath = 'promocodes.json'
 
 async def promocode_AutoComplete(interaction, current: str) -> List[app_commands.Choice[str]]:
-    promoData = get_json(promocodeDataPath)
-    return [app_commands.Choice(name=k, value=k) for k in promoData]
+    promoData = interaction.client.promocodeCollections.find()
+    return [app_commands.Choice(name=k, value=k) async for k in promoData]
 
 class Promocode(commands.Cog):
     def __init__(self, bot):
@@ -25,10 +25,8 @@ class Promocode(commands.Cog):
     @app_commands.choices(type_of_promo=[app_commands.Choice(name='literal', value='literal'),app_commands.Choice(name='percentage', value='percentage')])
     @app_commands.check(check)
     async def create_promocode(self, interaction: discord.Interaction, promocode: str, type_of_promo: str, amount: int):
-        promoData = get_json(promocodeDataPath)
         amount = amount if type_of_promo == "literal" else max(min(amount, 99), 1)
-        promoData[promocode] = {"Type":type_of_promo,"Value":amount if type_of_promo == "literal" else max(min(amount, 99), 1)}
-        save_json(promoData, promocodeDataPath)
+        await interaction.client.promocodeCollections.insert_one({"Type":type_of_promo,"Value":amount if type_of_promo == "literal" else max(min(amount, 99), 1)})
         await interaction.response.send_message("Success", ephemeral=True)
 
 
@@ -38,10 +36,10 @@ class Promocode(commands.Cog):
     @app_commands.check(check)
     async def list_promocode(self, interaction):
         await interaction.response.defer(ephemeral=True)
-        promoData = get_json(promocodeDataPath)
+        promoData = interaction.client.promocodeCollections.find()
         res = "```"
-        for prom in promoData:
-            tempres = f'{prom}: Type:{promoData[prom]["Type"]} | Value:{promoData[prom]["Value"]}'
+        async for prom in promoData:
+            tempres = f'{prom}: Type:{promoData["Type"]} | Value:{promoData["Value"]}'
             if len(res+tempres)>= 2048:
                 await interaction.followup.send(res+'```', ephemeral=True)
                 res = '```'
@@ -55,9 +53,7 @@ class Promocode(commands.Cog):
     @app_commands.check(check)
     @app_commands.autocomplete(promocode=promocode_AutoComplete)
     async def remove_promocode(self, interaction: discord.Interaction, promocode: str):
-        promoData = get_json(promocodeDataPath)
-        del promoData[promocode]
-        save_json(promoData, promocodeDataPath)
+        await interaction.client.promocodeCollections.delete_one({"_id": promocode})
         await interaction.response.send_message("Success", ephemeral=True)
 
 

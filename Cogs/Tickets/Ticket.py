@@ -26,7 +26,7 @@ class Ticket(commands.Cog):
     @app_commands.guilds(discord.Object(id=1163825960399949884))
     @app_commands.check(check)
     async def set_ticket_category(self, interaction: Interaction, category: discord.CategoryChannel):
-        ticketData = get_json(ticketDataPath)
+        ticketData = get_json('settings.json')
 
         ticketData["ticketCategory"] = category.id
         save_json(ticketData, ticketDataPath)
@@ -36,7 +36,7 @@ class Ticket(commands.Cog):
     @commands.check(ctxcheck)
     @commands.command()
     async def set_forward_channel(self, ctx, channel: discord.TextChannel):
-        ticketData = get_json(ticketDataPath)
+        ticketData = get_json('settings.json')
 
         ticketData["forwardChannel"] = channel.id
         save_json(ticketData, ticketDataPath)
@@ -48,21 +48,21 @@ class Ticket(commands.Cog):
     @app_commands.guilds(discord.Object(id=1163825960399949884))
     @app_commands.check(check)
     async def close_ticket(self, interaction: Interaction, ticket_channel: TextChannel):
-        ticketData = get_json(ticketDataPath)
-        for user in ticketData["Tickets"]:
-            if not "ticketChannel" in ticketData["Tickets"][user]: continue
-            if ticketData["Tickets"][user]["ticketChannel"] == ticket_channel.id:
+        ticketData = await interaction.client.ticketCollections.find() 
+        async for userData in ticketData["Tickets"]:
+            if not "ticketChannel" in userData: continue
+            if userData["ticketChannel"] == ticket_channel.id:
                 try:
-                    userObject = await interaction.guild.fetch_member(user)
+                    userObject = await interaction.guild.fetch_member(userData["_id"])
                     channel = await self.bot.fetch_channel(ticket_channel.id)
                 except discord.errors.NotFound: return
                 try:
-                    processing.append(user)
-                    message = await channel.fetch_message(ticketData["Tickets"][user]["currentMessage"])
+                    processing.append(userData["_id"])
+                    message = await channel.fetch_message(userData["currentMessage"])
                     await message.edit(content=f"Order closed")
-                    processing.remove(user)
+                    processing.remove(userData["_id"])
                 except Exception as e: print(e)
-                clearData(user)
+                await clearData(userData["_id"])
                 return
 
 
@@ -74,7 +74,7 @@ class Ticket(commands.Cog):
 
         guild: Guild = interaction.guild
 
-        ticketData = get_json(ticketDataPath)
+        ticketData = get_json('settings.json')
         if ticketData["ticketCreateMessage"] != 0:
             channel: TextChannel = await guild.fetch_channel(ticketData["ticketCreateMessageChannel"])
             message = None 
@@ -96,16 +96,6 @@ class Ticket(commands.Cog):
 
 
 async def setup(bot):
-    ticketData = get_json(ticketDataPath)
-    if "ticketCreateMessage" not in ticketData:
-        ticketData = {}
-        ticketData["ticketCreateMessage"] = 0
-        ticketData["ticketCreateMessageChannel"] = 0
-        ticketData["ticketCategory"] = 0
-        ticketData["forwardChannel"] = 0
-        ticketData["Tickets"] = {}
-        
-        save_json(ticketData, ticketDataPath)
     await bot.add_cog(Ticket(bot))
 
 

@@ -17,17 +17,18 @@ finishedDataPath = 'finished.json'
 storeDataPath = 'storedata.json'
 
 async def fincheck(interaction: discord.Interaction):
-    storeData = get_json(storeDataPath)
-    finishedData = get_json(finishedDataPath)
-    for v in storeData['items']:
-        if not v in finishedData:
-            finishedData[v] = 0
-    save_json(finishedData, finishedDataPath)
+    storeData = interaction.client.storeCollections.find()
+    async for k in storeData:
+        finishedData = await interaction.client.finishedCollections.find_one({"_id": k["_id"]})
+        if not finishedData:
+            await interaction.client.finishedCollections.insert_one({"_id": k["_id"], "Count": 0})
     return interaction.user.id == 672514949184225310 or interaction.user.id == 861763675915288576
 
 async def labelAutoComplete(interaction, current: str) -> List[app_commands.Choice[str]]:
-    storeData = get_json(storeDataPath)
-    return [app_commands.Choice(name=k, value=k) for k in storeData['items']]
+    storeData = interaction.client.finishedCollections.find()
+    try:
+        return [app_commands.Choice(name=k["_id"], value=k["_id"]) async for k in storeData]
+    except Exception as e: print(e)
 
 class FinishedOrders(commands.Cog):
     def __init__(self, bot):
@@ -39,16 +40,16 @@ class FinishedOrders(commands.Cog):
     @app_commands.guilds(discord.Object(id=1163825960399949884))
     @app_commands.check(fincheck)
     async def view_finished(self, interaction: Interaction):
-        finishedData = get_json(finishedDataPath)
-        storeData = get_json(storeDataPath)
+        finishedData = interaction.client.finishedCollections.find()
         guild = interaction.guild
-        guildId = guild.id
 
         listStr = "```"
         current = 0
-        for k,v in finishedData.items():
-            current+=v*storeData['items'][k]
-            listStr += f"{k}:   {v}| Total of product: ${v*storeData['items'][k]}\n"
+        async for k in finishedData:
+            count = k["Count"]
+            storeData = await interaction.client.storeCollections.find_one({"_id": k["_id"]})
+            current+=count*storeData["Price"]
+            listStr += f"{k['_id']}:   {k['Count']}| Total of product: ${k['Count']*storeData['Price']}\n"
 
         listStr += f"\nTotal of all: ${current}"
         listStr += "```"
@@ -60,9 +61,9 @@ class FinishedOrders(commands.Cog):
     @app_commands.autocomplete(labels=labelAutoComplete)
     @app_commands.check(fincheck)
     async def change_finished(self, interaction: Interaction, labels: str, amount: int):
-        finishedData = get_json(finishedDataPath)
-        finishedData[labels] = amount
-        save_json(finishedData, finishedDataPath)
+        finishedData = await interaction.client.finishedCollections.find_one({"_id": labels}) 
+        finishedData["Count"] = amount
+        await interaction.client.finishedCollections.update_one({"_id": labels}, {"$set":finishedData})
         await interaction.response.send_message('success', ephemeral=True)
 
 
@@ -72,9 +73,7 @@ class FinishedOrders(commands.Cog):
     @app_commands.autocomplete(labels=labelAutoComplete)
     @app_commands.check(fincheck)
     async def increase_finished(self, interaction: Interaction, labels: str):
-        finishedData = get_json(finishedDataPath)
-        finishedData[labels] += 1
-        save_json(finishedData, finishedDataPath)
+        await interaction.client.finishedCollections.update_one({"_id": labels}, {"$inc": {"Count": 1}})
         await interaction.response.send_message('success', ephemeral=True)
 
 
@@ -84,10 +83,9 @@ class FinishedOrders(commands.Cog):
     @app_commands.autocomplete(labels=labelAutoComplete)
     @app_commands.check(check)
     async def decrease_finished(self, interaction: Interaction, labels: str):
-        finishedData = get_json(finishedDataPath)
-        if finishedData[labels] > 0:
-            finishedData[labels] -= 1
-            save_json(finishedData, finishedDataPath)
+        finishedData = await interaction.client.finishedCollections.find_one({"_id": labels}) 
+        if finishedData["Count"] > 0:
+            await interaction.client.finishedCollections.update_one({"_id": labels}, {"$inc": {"Count": -1}})
             await interaction.response.send_message('success', ephemeral=True)
             return
         await interaction.response.send_message('value is 0', ephemeral=True)
@@ -95,10 +93,4 @@ class FinishedOrders(commands.Cog):
 
 
 async def setup(bot):
-    finishedData = get_json(finishedDataPath)
-    storeData = get_json(storeDataPath)
-    for v in storeData['items']:
-        if not v in finishedData:
-            finishedData[v] = 0
-    save_json(finishedData, finishedDataPath)
     await bot.add_cog(FinishedOrders(bot))

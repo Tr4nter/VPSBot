@@ -146,7 +146,7 @@ class createTicket(View):
     async def buyButtonCallback(self, interaction: discord.Interaction):
         if str(interaction.user.id) not in self.users:
             self.users[str(interaction.user.id)] = {}
-        ticketData = get_json(ticketDataPath)
+        ticketData = await interaction.client.ticketCollections.find_one({"_id": interaction.user.id})
         guild = interaction.guild
         
         formData = self.users[str(interaction.user.id)]
@@ -163,32 +163,29 @@ class createTicket(View):
         if not 'currentRegion' in formData:
             await interaction.response.send_message("Please select a region",ephemeral=True, delete_after=3)
             return
-        if not str(userId) in ticketData["Tickets"]:
-            ticketData["Tickets"][str(userId)] = {}
-            ticketData["Tickets"][str(userId)]["currentInvoice"] = None
-            ticketData["Tickets"][str(userId)]["currentProduct"] = None
-            ticketData["Tickets"][str(userId)]["currentRegion"] = None
-            ticketData["Tickets"][str(userId)]["currentMessage"] = None
+        if not ticketData:
+            await interaction.client.ticketCollections.insert_one({"_id": userId, "currentInvoice": None, "currentProduct": None, "currentRegion": None, "currentMessage": None})
+        ticketData = await interaction.client.ticketCollections.find_one({"_id": userId})
 
-
-        if ticketData["Tickets"][str(userId)]["currentInvoice"]:
+        if ticketData["currentInvoice"]:
             await interaction.response.send_message("You've already have an order going on, please resolve it before making another order.", ephemeral=True, delete_after=3)
             return
 
-        storeData = get_json(storeDataPath)
-        category = get(guild.categories, id=ticketData["ticketCategory"])
-        if "ticketChannel" not in ticketData["Tickets"][str(userId)]:
+        storeData = await interaction.client.storeCollections.find_one({"_id": formData["currentProduct"]})
+        settings = get_json("settings.json")
+        category = get(guild.categories, id=settings["ticketCategory"])
+        if "ticketChannel" not in ticketData:
             channel = await category.create_text_channel(name=f"{user.name}")
             await channel.set_permissions(interaction.guild.default_role, read_messages=False)
-            ticketData["Tickets"][str(userId)]["ticketChannel"] = channel.id
+            await interaction.client.ticketCollections.update_one({"_id": userId}, {"$set": {"ticketChannel": channel.id}})
         else:
-            channel = await interaction.guild.fetch_channel(ticketData["Tickets"][str(userId)]["ticketChannel"])
+            channel = await interaction.guild.fetch_channel(ticketData["ticketChannel"])
 
         await channel.set_permissions(user, read_messages=True, send_messages=True)
 
         crypto = False
         new_invoice = None
-        deductedPrice = storeData['items'][formData["currentProduct"]]
+        deductedPrice = storeData["Price"]
         if deductedPrice <= 0: await interaction.response.send_message("Error",ephemeral=True, delete_after=5) 
         if 'Modal' in formData and formData['Modal'].val:
             if formData['Modal'].val["Type"] == "literal":
@@ -207,21 +204,20 @@ class createTicket(View):
             price = new_invoice["price"]
             crypto = True
         if crypto and new_invoice:
-            ticketData["Tickets"][str(userId)]["currentInvoice"] = new_invoice['id']
+            ticketData["currentInvoice"] = new_invoice['id']
 
             await channel.send(f'Please send exactly\n{price} {formData["currentPayment"]}\nto this address\n{new_invoice["addresses"][formData["currentPayment"]]}')
-            ticketData["Tickets"][str(userId)]["currentMessage"] = (await channel.send("Expiring in: ...")).id
+            ticketData["currentMessage"] = (await channel.send("Expiring in: ...")).id
         else:
             orderId = "paypal"+str(uuid.uuid4()).split("-")[-1]
 
-            ticketData["Tickets"][str(userId)]["currentInvoice"] = orderId
-            await channel.send(f"<@{admin}> Paypal order, please wait for admin's response., ID={orderId}, Price={deductedPrice}")
+            ticketData["currentInvoice"] = orderId
+            await channel.send(f"<@{admin}> PayPal order, please wait for admin's response., ID={orderId}, Price={deductedPrice}")
 
 
-        ticketData["Tickets"][str(userId)]["currentProduct"] = formData['currentProduct']
-        ticketData["Tickets"][str(userId)]["currentRegion"] = formData['currentRegion']
-
-        save_json(ticketData, ticketDataPath)
+        ticketData["currentProduct"] = formData['currentProduct']
+        ticketData["currentRegion"] = formData['currentRegion']
+        await interaction.client.ticketCollections.update_one({"_id": userId}, {"$set": ticketData})
 
 
         

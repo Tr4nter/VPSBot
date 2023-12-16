@@ -60,7 +60,6 @@ paidSent = []
 processing = []
 
 
-currentListOfOrders = []
 
 confirmer = os.environ.get("CONFIRMER")
 
@@ -71,36 +70,34 @@ async def clearData(user: int, clearChannel=False):
         loopData["currentProduct"] = None
         loopData["currentRegion"] = None
         if clearChannel:
-            del loopData["Tickets"][user]["ticketChannel"]
-        await client.ticketCollections.update_one({"_id": user, "$set": loopData})
+            del loopData["ticketChannel"]
+        await client.ticketCollections.update_one({"_id": user}, {"$set": loopData})
 
-
-@tasks.loop(seconds=1)
+async def get_invoice(invoiceId):
+    return bitserverclient.get_invoice(invoice_id=invoiceId)
+@tasks.loop(seconds=0.5)
 async def loopa():
     global currentListOfOrders
-    loopData = client.ticketCollections.find()
+    loopData: motor.motor_asyncio.AsyncIOMotorCursor = client.ticketCollections.find()
     temp = []
-    userList = [i["_id"] async for i in loopData]
     async for userData in loopData:
-
         currentInvoice = userData['currentInvoice']
         if not currentInvoice: continue
         if currentInvoice.startswith("paypal"): temp.append(userData["_id"]); continue
-        inv = bitserverclient.get_invoice(invoice_id=currentInvoice)
-        if inv["status"] == "confirmed": temp.append(userData["_id"])
+        inv = await get_invoice(currentInvoice)
+        if inv["status"] == "complete" or inv["status"] == "confirmed": temp.append(userData["_id"])
         if userData["_id"] in processing: continue
         currentExpiration = int((inv["expirationTime"]-inv["currentTime"])/1000)
+        channel = await client.fetch_channel(userData["ticketChannel"])
+        message = await channel.fetch_message(userData["currentMessage"])
         try:
-            channel = await client.fetch_channel(userData["ticketChannel"])
-            message = await channel.fetch_message(userData["currentMessage"])
             await message.edit(content=f"Expiring in {currentExpiration} seconds")
-        except Exception as e: pass
+        except Exception as e: print(e)
 
 
         if userData["currentInvoice"] == None: continue
         
         if inv["status"] == "expired":
-            message = await channel.fetch_message(userData["currentMessage"])
             await message.edit(content=f"Expired")
             await clearData(userData["_id"])
             await channel.send(f'{inv["id"]} invoice has expired\nPlease create another buy order to retry, this ticket channel will stay active.') 
@@ -109,16 +106,16 @@ async def loopa():
         elif inv["status"] == "paid" and channel.id not in paidSent:
             await channel.send(f'{inv["id"]} invoice has received payment, please wait for it to be confirmed.') 
             paidSent.append(channel.id)
-        elif inv["status"] == "confirmed":
+        elif inv["status"] == "complete" or inv["status"] == "confirmed":
 
 
             await channel.send(f'{inv["id"]} invoice has been confirmed, you will receive your product shortly.') 
+            settings = get_json("settings.json")
             try:
-                forwardChannel = await client.fetch_channel(loopData["forwardChannel"])
+                forwardChannel = await client.fetch_channel(settings["forwardChannel"])
             except discord.errors.NotFound: continue
             await forwardChannel.send(f'Purchase request: {userData["currentProduct"]}\nRegion:{userData["currentRegion"]}\nID: {userData["currentInvoice"]}')
             processing.append(userData["_id"])
-    currentListOfOrders = [i for i in userList if i in temp]
 
 
 # @client.tree.interaction_check
@@ -128,7 +125,7 @@ async def deliver(ctx: discord.Interaction, id: str, ip: str, username: str, pas
     await ctx.response.defer()
     loopData =  client.ticketCollections.find()
     # content = ' '.join(content)
-    async for userData in loopData["Tickets"]:
+    async for userData in loopData:
         if id == userData["currentInvoice"]:
             # channel = await client.fetch_channel(loopData["Tickets"][user]["ticketChannel"])
             channel = await client.fetch_user(confirmer)
@@ -192,16 +189,16 @@ async def get_queue(interaction: discord.Interaction):
     rebootRequests = client.rebootRequests.find()
     res = "```"
     async for rebootRequest in rebootRequests:
-        machineData = await client.panelCollections.find_one({"_id": machine_id})
         for machine_id in rebootRequest["machines"]:
+            machineData = await client.panelCollections.find_one({"_id": machine_id})
             temp = f'**REBOOT**|{machine_id}|IP:{machineData["IP"]}|Username:{machineData["User"]}|Pass:{machineData["Pass"]}\n'
             if len(res + temp) >= 2048:
                 await interaction.channel.send(res + "```")
                 res = "```"
             res += temp
-    loopData = await client.ticketCollections.find_one({"_id": str(interaction.user.id)})
-    for user in currentListOfOrders:
-        temp = f'**Purchase**|{loopData["currentProduct"]}|Region:{loopData["currentRegion"]}|ID: {loopData["currentInvoice"]}\n'
+    tickers  = client.ticketCollections.find()
+    async for user in tickers:
+        temp = f'**Purchase**|{user["currentProduct"]}|Region:{user["currentRegion"]}|ID: {user["currentInvoice"]}\n'
         if len(res + temp) >= 2048:
             await interaction.channel.send(res + "```")
             res = "```"
@@ -232,7 +229,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     password = data[7]
     userData = await client.ticketCollections.find_one({"currentInvoice": id})
 
-    if userData["_id"] == "": return
+    if not userData: return
 
     if emote == "✅":
         ticketChannel = await client.fetch_channel(userData["ticketChannel"])

@@ -1,8 +1,10 @@
 env
+.env
 BTCPayServer
 env/*
 BTCPayServer/*
-
+*.json
+!settings.json
 __pycache__
 __pycache__/*
-.pyc
+*.pyc
